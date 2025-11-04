@@ -1,0 +1,37 @@
+plugins {
+    id 'application'
+	id 'java'
+	id 'org.springframework.boot' version '3.5.6'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+application {
+    mainClass = 'com.systemdesign.urlshortener.UrlshortenerApplication' // Replace with your actual main class
+//    applicationId = 'com.systemdesign.urlshortener' // Replace with your application ID
+}
+
+group = 'com.systemdesign'
+version = '0.0.1-SNAPSHOT'
+description = 'System Design Project to manipulate URL on Demand'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.security:spring-security-crypto'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
