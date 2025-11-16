@@ -30,6 +30,7 @@ url-shortener-api/
 │                   ├── model/
 │                   │   └── ShortenRequest.java
 │                   └── Application.java
+├── .env
 ├── build.gradle
 ├── settings.gradle
 └── README.md
@@ -218,50 +219,6 @@ public class ShortenRequest {
 }
 ```
 
-### service/URLStorageService.java
-
-**java**
-
-```
-package com.urlshortener.service;
-
-import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.Map;
-
-@Service
-public class URLStorageService {
-    private final Map<String, String> urlMap = new HashMap<>();
-    private final Map<String, String> reverseUrlMap = new HashMap<>();
-
-    public void storeURL(String shortCode, String originalURL) {
-        urlMap.put(shortCode, originalURL);
-        reverseUrlMap.put(originalURL, shortCode);
-    }
-
-    public String getOriginalURL(String shortCode) {
-        return urlMap.get(shortCode);
-    }
-
-    public String getShortCode(String originalURL) {
-        return reverseUrlMap.get(originalURL);
-    }
-
-    public boolean containsShortCode(String shortCode) {
-        return urlMap.containsKey(shortCode);
-    }
-
-    public boolean containsURL(String originalURL) {
-        return reverseUrlMap.containsKey(originalURL);
-    }
-
-    public int getSize() {
-        return urlMap.size();
-    }
-}
-```
-
 ### service/URLShortenerService.java
 
 **java**
@@ -307,7 +264,7 @@ public class URLShortenerService {
             sb.append(CHARACTERS.charAt(index));
         }
         String code = sb.toString();
-      
+    
         // Ensure uniqueness
         if (storageService.containsShortCode(code)) {
             return generateShortCode();
@@ -352,19 +309,19 @@ public class URLController {
     public ResponseEntity<Map<String, String>> shortenURL(@Valid @RequestBody ShortenRequest request) {
         String originalURL = request.getUrl();
         String shortCode = urlShortenerService.shortenURL(originalURL);
-      
+    
         Map<String, String> response = new HashMap<>();
         response.put("shortCode", shortCode);
         response.put("shortUrl", "http://localhost:8080/api/" + shortCode);
         response.put("originalUrl", originalURL);
-      
+    
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/expand/{shortCode}")
     public ResponseEntity<?> expandURL(@PathVariable String shortCode) {
         String originalUrl = urlShortenerService.expandURL(shortCode);
-      
+    
         if (originalUrl != null) {
             Map<String, String> response = new HashMap<>();
             response.put("shortCode", shortCode);
@@ -383,9 +340,9 @@ public class URLController {
     public void redirectToOriginalURL(
             @PathVariable String shortCode, 
             HttpServletResponse response) throws IOException {
-      
+    
         String originalUrl = urlShortenerService.expandURL(shortCode);
-      
+    
         if (originalUrl != null) {
             response.sendRedirect(originalUrl);
         } else {
@@ -399,7 +356,7 @@ public class URLController {
         stats.put("service", "URL Shortener API");
         stats.put("version", "1.0.0");
         stats.put("totalUrls", urlShortenerService.getTotalURLs());
-      
+    
         return ResponseEntity.ok(stats);
     }
 }
