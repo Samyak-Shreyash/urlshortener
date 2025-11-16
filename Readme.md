@@ -26,9 +26,10 @@ url-shortener-api/
 │                   │   └── URLController.java
 │                   ├── service/
 │                   │   ├── URLShortenerService.java
-│                   │   └── URLStorageService.java
 │                   ├── model/
-│                   │   └── ShortenRequest.java
+│                   │   └── UrlMapping.java
+model/
+│                   │   └── UrlMapping.java
 │                   └── Application.java
 ├── .env
 ├── build.gradle
@@ -264,7 +265,7 @@ public class URLShortenerService {
             sb.append(CHARACTERS.charAt(index));
         }
         String code = sb.toString();
-    
+  
         // Ensure uniqueness
         if (storageService.containsShortCode(code)) {
             return generateShortCode();
@@ -309,19 +310,19 @@ public class URLController {
     public ResponseEntity<Map<String, String>> shortenURL(@Valid @RequestBody ShortenRequest request) {
         String originalURL = request.getUrl();
         String shortCode = urlShortenerService.shortenURL(originalURL);
-    
+  
         Map<String, String> response = new HashMap<>();
         response.put("shortCode", shortCode);
         response.put("shortUrl", "http://localhost:8080/api/" + shortCode);
         response.put("originalUrl", originalURL);
-    
+  
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/expand/{shortCode}")
     public ResponseEntity<?> expandURL(@PathVariable String shortCode) {
         String originalUrl = urlShortenerService.expandURL(shortCode);
-    
+  
         if (originalUrl != null) {
             Map<String, String> response = new HashMap<>();
             response.put("shortCode", shortCode);
@@ -340,9 +341,9 @@ public class URLController {
     public void redirectToOriginalURL(
             @PathVariable String shortCode, 
             HttpServletResponse response) throws IOException {
-    
+  
         String originalUrl = urlShortenerService.expandURL(shortCode);
-    
+  
         if (originalUrl != null) {
             response.sendRedirect(originalUrl);
         } else {
@@ -356,7 +357,7 @@ public class URLController {
         stats.put("service", "URL Shortener API");
         stats.put("version", "1.0.0");
         stats.put("totalUrls", urlShortenerService.getTotalURLs());
-    
+  
         return ResponseEntity.ok(stats);
     }
 }
