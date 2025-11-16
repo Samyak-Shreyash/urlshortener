@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 @Service
 public interface UrlChangeService {
 
-    String getShortUrl(String url);
+    String getShortCode(String url);
 
     String getOriginalUrl(String shortUrl);
 }

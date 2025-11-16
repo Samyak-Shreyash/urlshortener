@@ -1,61 +1,80 @@
 package com.systemdesign.urlshortener.service.ServiceImpl;
 
-import java.security.SecureRandom;
-import java.util.HashMap;
+import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.systemdesign.urlshortener.model.UrlMapping;
+import com.systemdesign.urlshortener.repository.UrlRepository;
 import com.systemdesign.urlshortener.service.UrlChangeService;
+import com.systemdesign.urlshortener.utils.UrlUtils;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class UrlChangeServiceImpl implements UrlChangeService{
     
-    private static final String ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    
+    private static final Logger logger = LogManager.getLogger(UrlChangeServiceImpl.class);
 
-    private final SecureRandom random = new SecureRandom();
+    
+    // private static HashMap<String, UrlMapping> urlMap = new HashMap<>();
 
-    @Value("${base.url}")
-    private String baseUrl;
-
-    private static HashMap<String, UrlMapping> urlMap = new HashMap<>();
+    @Autowired
+    private UrlRepository urlRepository;
 
     @Override
-    public String getOriginalUrl(String url) {
-        
-        UrlMapping mappedUrl= urlMap.get(url);
-        if(mappedUrl == null) {
-            return "URL not found";
+    public String getOriginalUrl(String shortCode) {
+        logger.info("Checking if short code-{} exist in map",shortCode);
+        if(shortCode == null || shortCode.isEmpty() || shortCode.isBlank()) {
+            logger.info("short code-{} is null",shortCode);
+            return null;
         }
-        mappedUrl.setClickCount(mappedUrl.getClickCount() + 1);
-        urlMap.put(url, mappedUrl);
-        return mappedUrl.getOriginalUrl();
+        return this.getMappedUrl(shortCode);
+    }
+
+    private String getMappedUrl(String shortCode) {
+        logger.info("Retrieving URL Mapping for short code-{}",shortCode);
+        if(this.urlRepository.existsByShortCode(shortCode))
+        {
+            Optional<UrlMapping> optionalMap = this.urlRepository.findByShortCode(shortCode);
+            UrlMapping mappedUrl = optionalMap.get();
+            return mappedUrl.getShortCode(); 
+        }
+        return null;
     }
 
     @Override
-    public String getShortUrl(String oUrl) {
-        String shortCode = this.generateShortUrl();
-        UrlMapping mappedUrl = this.createUrlMapping(oUrl, shortCode);
-           urlMap.put(shortCode, mappedUrl);            
-            return baseUrl.concat(mappedUrl.getShortUrl());
+    public String getShortCode(String oUrl) {
+        if(oUrl==null || oUrl.isEmpty() || oUrl.isBlank())
+            return null;
+        logger.info("Check if url:{} is mapped",oUrl);
+        String urlHash = UrlUtils.hashUrl(oUrl);
+        return this.getSavedShortCode(urlHash)==null?this.getSavedShortCode(urlHash): this.createUrlMapping(oUrl, urlHash);
         }
     
 
-    private String generateShortUrl() {
-        final int SHORT_URL_LENGTH = 6;
-        StringBuilder shortUrl = new StringBuilder(SHORT_URL_LENGTH);
-
-        for (int i = 0; i < SHORT_URL_LENGTH; i++) {
-            int randomIndex = random.nextInt(ALPHABET.length());
-            shortUrl.append(ALPHABET.charAt(randomIndex));
-        }
-        
-        return shortUrl.toString();
+    private String getSavedShortCode(String urlHash) {
+        Optional<String> shortCode =  this.urlRepository.findShortCodeByLongUrlHash(urlHash);
+        if(shortCode==null || shortCode.get()==null || shortCode.get().isEmpty())
+            return null;
+        logger.info("Retrieved Short Code {} for url-hash: {} from DB", shortCode.get(), urlHash);
+        return shortCode.get();
     }
 
-    private UrlMapping createUrlMapping(String url, String shortUrl) {
-        return new UrlMapping(url, shortUrl);
+
+    @Transactional
+    private String   createUrlMapping(String url, String urlHash) {
+        if(url==null)
+            return null;
+        String shortCode = UrlUtils.generateShortCode();
+        logger.info("Generated new short code {} for Url: {}",shortCode, url);
+        UrlMapping new_url_map = new UrlMapping(url, shortCode, urlHash);
+        this.urlRepository.save(new_url_map);
+        logger.info("New URL Mapping saved {}",new_url_map.toString());
+        return new_url_map.getShortCode();
     }
-    
 }
