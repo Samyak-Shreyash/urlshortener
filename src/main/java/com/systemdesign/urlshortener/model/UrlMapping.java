@@ -1,6 +1,7 @@
 package com.systemdesign.urlshortener.model;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -27,10 +28,10 @@ public class UrlMapping {
     @Column(name = "short_code", nullable = false, unique = true, length = 10)
     private String shortCode;
     
-    @Column(name = "long_url", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "long_url", nullable = false, unique = true, columnDefinition = "TEXT")
     private String longUrl;
     
-    @Column(name = "long_url_hash", nullable = false, length = 64)
+    @Column(name = "long_url_hash", nullable = false, unique = true, length = 64)
     private String longUrlHash;
     
     @CreationTimestamp
@@ -96,5 +97,10 @@ public class UrlMapping {
                 ", longUrlHash='" + longUrlHash + '\'' +
                 ", createdAt=" + createdAt +
                 '}';
+    }
+
+    public Optional<UrlMapping> map(Object object) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'map'");
     }
 }

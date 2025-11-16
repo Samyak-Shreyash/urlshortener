@@ -47,7 +47,7 @@ public class UrlUtils {
     }
 
     
-    public static String generateShortCode() {
+    public static synchronized String generateShortCode() {
         SecureRandom random = new SecureRandom();
         StringBuilder shortCode = new StringBuilder(SHORT_CODE_LENGTH);
 

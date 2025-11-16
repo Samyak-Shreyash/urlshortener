@@ -21,6 +21,9 @@ public interface UrlRepository extends JpaRepository<UrlMapping, Long> {
     // Check if short code exists
     boolean existsByShortCode(String shortCode);
     
+    // Check if urlHash exists
+    boolean existsByLongUrlHash(String longUrlHash);
+
     // Custom query for efficient lookup
     @Query("SELECT u.shortCode FROM UrlMapping u WHERE u.longUrlHash = :hash")
     Optional<String> findShortCodeByLongUrlHash(@Param("hash") String longUrlHash);
