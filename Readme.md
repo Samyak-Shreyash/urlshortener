@@ -28,8 +28,10 @@ url-shortener-api/
 │                   │   ├── URLShortenerService.java
 │                   ├── model/
 │                   │   └── UrlMapping.java
-model/
-│                   │   └── UrlMapping.java
+|                   ├── repository/
+│                   │   └── UrlRepository.java
+|                   ├── utils/
+│                   │   └── UrlUtils.java
 │                   └── Application.java
 ├── .env
 ├── build.gradle
@@ -490,7 +492,6 @@ public class URLController {
 
 ## Future Enhancements
 
-* Database persistence (H2, PostgreSQL)
 * URL validation and sanitization
 * Custom short codes
 * URL expiration
@@ -498,7 +499,6 @@ public class URLController {
 * Rate limiting
 * API authentication (JWT)
 * Swagger/OpenAPI documentation
-* Docker containerization
 * Cache implementation (Redis)
 * Bulk URL shortening
 
