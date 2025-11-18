@@ -1,28 +1,263 @@
-# docker-compose.yml
 services:
-  mysql_single:
+  # Load Balancer
+  nginx_load_balancer:
+    image: nginx:1.24
+    container_name: nginx_load_balancer
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/proxy.conf:/etc/nginx/proxy.conf
+    depends_on:
+      url_shortener_app1:
+        condition: service_healthy
+      url_shortener_app2:
+        condition: service_healthy
+      url_shortener_app3:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  # Database Layer
+  mysql_master:
     image: mysql:8.0
     restart: unless-stopped
-    container_name: mysql_single
+    container_name: system_design_master
     env_file:
-      - ./.env
+      - .env
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_USER_PASSWORD}
+      MYSQL_REPLICATION_USER: ${MYSQL_REPLICATION_USER}
+      MYSQL_REPLICATION_PASSWORD: ${MYSQL_REPLICATION_PASSWORD}
+      MYSQL_TCP_PORT: ${MASTER_PORT}
       TZ: UTC
-    
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --innodb-buffer-pool-size=1G
+      - --innodb-log-file-size=256M
+      - --innodb-flush-log-at-trx-commit=2
+      - --innodb-lock-wait-timeout=10
+      - --innodb-deadlock-detect=ON
+      - --transaction-isolation=READ-COMMITTED
+      - --innodb-autoinc-lock-mode=2
+      - --innodb-buffer-pool-instances=8
+      - --innodb-read-io-threads=8
+      - --innodb-write-io-threads=8
+      - --max-connections=200
+      - --innodb-rollback-on-timeout=ON
+      - --log-slave-updates=ON
+      - --binlog-do-db=${MYSQL_DATABASE}
+      - --port=${MASTER_PORT}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - master_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
     ports:
-      - "${MASTER_PORT}:3306"
+      - "${MASTER_PORT}:${MASTER_PORT}"
     healthcheck:
-      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD} --port=${MASTER_PORT}"]
       interval: 5s
       timeout: 10s
       retries: 10
       start_period: 30s
+    networks:
+      - backend-network
+
+  mysql_slave1:
+    image: mysql:8.0
+    restart: unless-stopped
+    container_name: system_design_s1
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_USER_PASSWORD}
+      MYSQL_TCP_PORT: ${SLAVE1_PORT}
+      TZ: UTC
+    command:
+      - --server-id=2
+      - --relay-log=mysql-relay-bin
+      - --read-only=1
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --skip-slave-start
+      - --replicate-do-db=${MYSQL_DATABASE}
+      - --port=${SLAVE1_PORT}
+    volumes:
+      - slave1_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "${SLAVE1_PORT}:${SLAVE1_PORT}"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD} --port=${SLAVE1_PORT}"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  mysql_slave2:
+    image: mysql:8.0
+    restart: unless-stopped
+    container_name: system_design_s2
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_USER_PASSWORD}
+      MYSQL_TCP_PORT: ${SLAVE2_PORT}
+      TZ: UTC
+    command:
+      - --server-id=3
+      - --relay-log=mysql-relay-bin
+      - --read-only=1
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --skip-slave-start
+      - --replicate-do-db=${MYSQL_DATABASE}
+      - --port=${SLAVE2_PORT}
+    volumes:
+      - slave2_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "${SLAVE2_PORT}:${SLAVE2_PORT}"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD} --port=${SLAVE2_PORT}"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  # Application Instances
+  url_shortener_app1:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: app1
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,cluster
+      INSTANCE_ID: app1
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+      mysql_slave1:
+        condition: service_healthy
+      mysql_slave2:
+        condition: service_healthy
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  url_shortener_app2:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: app2
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,cluster
+      INSTANCE_ID: app2
+    ports:
+      - "8082:8081"
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+      mysql_slave1:
+        condition: service_healthy
+      mysql_slave2:
+        condition: service_healthy
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  url_shortener_app3:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: app3
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,cluster
+      INSTANCE_ID: app3
+    ports:
+      - "8083:8081"
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+      mysql_slave1:
+        condition: service_healthy
+      mysql_slave2:
+        condition: service_healthy
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # MySQL Client Tool (Optional)
+  mysql_client:
+    build:
+      context: .
+      dockerfile: Dockerfile.mysql-client
+    container_name: mysql_client
+    env_file:
+      - .env
+    volumes:
+      - ./scripts:/scripts
+      - ./backups:/backups
+    networks:
+      - backend-network
+    stdin_open: true
+    tty: true
+    profiles:
+      - tools
 
 volumes:
-  mysql_data:
+  master_data:
+  slave1_data:
+  slave2_data:
+
+networks:
+  backend-network:
+    driver: bridge

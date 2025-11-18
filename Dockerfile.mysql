@@ -1,0 +1,20 @@
+FROM ubuntu:22.04
+
+# Install MySQL client and utilities
+RUN apt-get update && apt-get install -y \
+    mysql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create scripts directory
+RUN mkdir -p /scripts
+COPY scripts/ /scripts/
+RUN chmod +x /scripts/*.sh
+
+# Create backups directory
+RUN mkdir -p /backups
+
+WORKDIR /app
+
+# Default command - interactive MySQL client
+CMD ["bash"]
